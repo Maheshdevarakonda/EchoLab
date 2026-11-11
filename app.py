@@ -564,7 +564,7 @@ def build_ui(port=7860):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--port", type=int, default=7860)
+    ap.add_argument("--port", type=int, default=int(os.environ.get("PORT", 7860)))
     ap.add_argument("--host", default="0.0.0.0", help="0.0.0.0 = reachable from other devices on your network")
     ap.add_argument("--share", action="store_true", help="create a public gradio.live link")
     ap.add_argument("--no-browser", action="store_true")
