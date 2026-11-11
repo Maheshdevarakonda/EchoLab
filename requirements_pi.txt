@@ -1,0 +1,7 @@
+# Raspberry Pi 4, 64-bit Raspberry Pi OS (Bookworm, Python 3.11). No TensorFlow / librosa needed.
+numpy
+scipy
+soundfile
+sounddevice             # needs: sudo apt install libportaudio2
+tflite-runtime          # if no wheel for your Python: pip install ai-edge-litert  (auto-detected)
+gpiozero

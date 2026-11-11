@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+
+# Datasets and raw audio (large files)
+dataset/
+dataset_raw/
+fan/
+*.wav
+*.mp3
+*.flac
+*.ogg
+*.zip
+
+# Temporary training fold caches
+models/echolab_work/
+outputs/
+
+# Environment / IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.log
+training_log.txt

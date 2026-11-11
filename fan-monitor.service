@@ -1,0 +1,14 @@
+[Unit]
+Description=Acoustic fan fault monitor
+After=network-online.target sound.target
+Wants=network-online.target
+
+[Service]
+User=pi
+WorkingDirectory=/home/pi/fan
+ExecStart=/home/pi/fanenv/bin/python /home/pi/fan/pi_inference.py --device 1
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
