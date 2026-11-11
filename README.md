@@ -1,3 +1,15 @@
+---
+title: EchoLab Fan Anomaly Detection
+emoji: 🎧
+colorFrom: blue
+colorTo: indigo
+sdk: gradio
+sdk_version: 5.20.1
+app_file: app.py
+pinned: false
+license: mit
+---
+
 # EchoLab: Fan Anomaly Detection (MobileNetV2 + PCA)
 
 Finding faulty fans by listening to their sound · MIMII Fan id_00 · website + training pipeline + Raspberry Pi version.
