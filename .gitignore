@@ -8,7 +8,7 @@ env/
 venv/
 .venv/
 
-# Datasets and raw audio (large files)
+# Audio datasets & raw data (do not push gigabytes of WAVs to GitHub)
 dataset/
 dataset_raw/
 fan/
@@ -18,14 +18,14 @@ fan/
 *.ogg
 *.zip
 
-# Temporary training fold caches
+# Temporary training fold caches & logs
 models/echolab_work/
 outputs/
+*.log
+training_log.txt
 
-# Environment / IDE / OS
+# Editor / OS
 .vscode/
 .idea/
 .DS_Store
 Thumbs.db
-*.log
-training_log.txt
