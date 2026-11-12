@@ -184,7 +184,10 @@ def run_analysis(path, score_label, op_label, offset, hop, cal, tg_token, tg_cha
         res = core.analyze_audio(b, path, Path(path).name, score, op, thr, float(hop), shift=(cal or {}).get("shift"))
     except ValueError as e:
         return empty_outputs(html.escape(str(e)))
-    cam = b.gradcam(res["best"]["db"]) if res["best"] is not None else None
+    # Grad-CAM is pre-rendered in Model & Results. In live inference we rely on lightweight TFLite (<100MB RAM, ~1s)
+    cam = None
+    if os.environ.get("ENABLE_LIVE_GRADCAM", "0") == "1":
+        cam = b.gradcam(res["best"]["db"]) if res["best"] is not None else None
     fig_t, fig_s = core.fig_timeline(res), core.fig_spectrogram(res, cam)
     fig_p = core.fig_pca_map(b, res["best"]["emb"] if res["best"] is not None else None)
     df = res["windows"].copy()
@@ -196,8 +199,9 @@ def run_analysis(path, score_label, op_label, offset, hop, cal, tg_token, tg_cha
     if tg_on and res["verdict"] in ("FAULTY", "POSSIBLE FAULT"):
         ok, msg = core.send_telegram(tg_token, tg_chat, core.alert_text(res))
         note = f'<div class="el-banner {"el-info" if ok else "el-warn"}">Telegram: {html.escape(msg)}</div>'
-    return (verdict_html(res) + note, scores_html(res) + warnings_html(res), fig_t, fig_s, fig_p, show, tmp.name,
-            "" if cam is not None else "Grad-CAM needs TensorFlow and models/echolab/model.keras; it is not available in this environment.")
+    cam_msg = ("" if cam is not None else
+               "💡 Live edge inference uses TFLite (~1s response time). Detailed Grad-CAM figures are available in the <b>Model & Results</b> tab.")
+    return (verdict_html(res) + note, scores_html(res) + warnings_html(res), fig_t, fig_s, fig_p, show, tmp.name, cam_msg)
 
 
 def run_calibration(files):
@@ -573,7 +577,7 @@ def main():
     print("EchoLab model:", ("loaded" + (" (QUICK run)" if b.quick else "")) if b else
           "none yet: open the Setup & Train tab")
     demo = build_ui(a.port)
-    demo.queue()
+    demo.queue(default_concurrency_limit=5)
     lk = dict(server_name=a.host, server_port=a.port, share=a.share, inbrowser=not a.no_browser, prevent_thread_lock=True)
     if GR_MAJOR >= 6:
         lk.update(theme=make_theme(), css=CSS)
