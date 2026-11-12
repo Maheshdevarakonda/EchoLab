@@ -574,8 +574,8 @@ def build_ui(port=7860):
                 share_md = gr.Markdown("")
                 qr_img = gr.Image(label="Scan to open on a phone", interactive=False, width=300)
                 gr.Markdown("Start with `python app.py --share` for a public link that works from anywhere.")
-    demo.load(lambda: (hero_html(), results_html(), status_html(), *fig_paths(), pca_lab_png(), *share_info(port)),
-              None, [hero, res_html, status, *imgs, pca_img, share_md, qr_img])
+        demo.load(lambda: (hero_html(), results_html(), status_html(), *fig_paths(), pca_lab_png(), *share_info(port)),
+                  None, [hero, res_html, status, *imgs, pca_img, share_md, qr_img])
     return demo
 
 
