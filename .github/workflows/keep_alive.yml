@@ -1,0 +1,21 @@
+name: Keep Render Deployment Alive
+
+on:
+  schedule:
+    # Ping every 14 minutes so Render's 15-minute inactivity sleep timer never triggers
+    - cron: "*/14 * * * *"
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send HTTP Ping
+        run: |
+          STATUS=$(curl -s -L -o /dev/null -w "%{http_code}" https://echolab-4do4.onrender.com)
+          echo "Pinged EchoLab! HTTP Status Code: $STATUS"
+          if [ "$STATUS" -ge 200 ] && [ "$STATUS" -lt 400 ]; then
+            echo "Deployment is online and healthy."
+          else
+            echo "Deployment response status: $STATUS"
+          fi
