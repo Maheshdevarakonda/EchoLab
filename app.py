@@ -11,13 +11,26 @@ models/echolab/metrics.json, which only the training script writes.
 """
 from __future__ import annotations
 
+import sys
+
+# Auto-forward to Streamlit app if deployed on Streamlit Cloud (which defaults to app.py)
+try:
+    import streamlit as _st
+    if hasattr(_st, "runtime") and _st.runtime.exists():
+        import streamlit_app
+        streamlit_app.main()
+        sys.exit(0)
+except SystemExit:
+    sys.exit(0)
+except Exception:
+    pass
+
 import argparse
 import html
 import json
 import os
 import socket
 import subprocess
-import sys
 import tempfile
 import time
 from collections import deque
@@ -561,8 +574,8 @@ def build_ui(port=7860):
                 share_md = gr.Markdown("")
                 qr_img = gr.Image(label="Scan to open on a phone", interactive=False, width=300)
                 gr.Markdown("Start with `python app.py --share` for a public link that works from anywhere.")
-        demo.load(lambda: (hero_html(), results_html(), status_html(), *fig_paths(), pca_lab_png(), *share_info(port)),
-                  None, [hero, res_html, status, *imgs, pca_img, share_md, qr_img])
+    demo.load(lambda: (hero_html(), results_html(), status_html(), *fig_paths(), pca_lab_png(), *share_info(port)),
+              None, [hero, res_html, status, *imgs, pca_img, share_md, qr_img])
     return demo
 
 
