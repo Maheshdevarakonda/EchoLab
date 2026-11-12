@@ -8,4 +8,5 @@ soundfile
 librosa
 tensorflow>=2.16        # training, Grad-CAM, TFLite export. A GPU makes training ~10x faster
 gradio>=5               # the website (works with Gradio 5 and 6)
+streamlit>=1.30         # permanent Streamlit Cloud deployment
 qrcode[pil]             # QR code on the Share tab
