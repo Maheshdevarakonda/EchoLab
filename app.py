@@ -156,9 +156,27 @@ VICON = {"HEALTHY": "✔", "FAULTY": "✖", "POSSIBLE FAULT": "⚠", "NO SIGNAL"
 def verdict_html(res):
     c = VCOL[res["verdict"]]
     pz = "–" if res["peak_z"] is None else f"{res['peak_z']:.2f}"
-    return (f'<div class="el-verdict" style="background:{c}"><h2>{VICON[res["verdict"]]} {res["verdict"]}</h2>'
-            f'<p>{res["n_flagged"]} of {res["n_valid"]} analysed 10-second windows flagged &nbsp;·&nbsp; '
-            f'peak score z = {pz} &nbsp;·&nbsp; threshold z = {res["threshold"]:.2f} &nbsp;·&nbsp; {html.escape(res["name"])}</p></div>')
+    v_box = (f'<div class="el-verdict" style="background:{c}"><h2>{VICON[res["verdict"]]} {res["verdict"]}</h2>'
+             f'<p>{res["n_flagged"]} of {res["n_valid"]} analysed 10-second windows flagged &nbsp;·&nbsp; '
+             f'peak score z = {pz} &nbsp;·&nbsp; threshold z = {res["threshold"]:.2f} &nbsp;·&nbsp; {html.escape(res["name"])}</p></div>')
+    diag = res.get("diagnostics")
+    if not diag:
+        return v_box
+    diag_box = f'''
+    <div style="background:#0f2033; border:1px solid #1e40af; border-radius:12px; padding:14px 18px; margin:8px 0; color:#cbd5e1;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+            <span style="color:#60a5fa; font-weight:700; font-size:0.8rem; letter-spacing:0.1em; text-transform:uppercase;">🔬 Physics-Informed Root-Cause Profiler</span>
+            <span style="background:{diag['status_color']}; color:white; padding:2px 8px; border-radius:12px; font-size:0.75rem; font-weight:700;">{diag['status_label']} ({diag['health_score']}%)</span>
+        </div>
+        <div style="font-size:1.05rem; font-weight:700; color:#f8fafc; margin-bottom:4px;">
+            Primary Diagnosis: <span style="color:#38bdf8;">{html.escape(diag['primary_cause'])}</span>
+        </div>
+        <div style="font-size:0.85rem; color:#94a3b8; line-height:1.4;">
+            <b style="color:#cbd5e1;">Actionable Maintenance:</b> {html.escape(diag['recommendation'])}
+        </div>
+    </div>
+    '''
+    return v_box + diag_box
 
 
 def scores_html(res):
@@ -182,7 +200,7 @@ def warnings_html(res):
 
 
 def empty_outputs(msg):
-    return (f'<div class="el-banner el-amber">{msg}</div>', "", None, None, None, None, None, "")
+    return (f'<div class="el-banner el-amber">{msg}</div>', "", None, None, None, None, None, None, "")
 
 
 def run_analysis(path, score_label, op_label, offset, hop, cal, tg_token, tg_chat, tg_on):
@@ -201,6 +219,7 @@ def run_analysis(path, score_label, op_label, offset, hop, cal, tg_token, tg_cha
     cam = None
     if os.environ.get("ENABLE_LIVE_GRADCAM", "0") == "1":
         cam = b.gradcam(res["best"]["db"]) if res["best"] is not None else None
+    fig_d = core.fig_root_cause(res["diagnostics"])
     fig_t, fig_s = core.fig_timeline(res), core.fig_spectrogram(res, cam)
     fig_p = core.fig_pca_map(b, res["best"]["emb"] if res["best"] is not None else None)
     df = res["windows"].copy()
@@ -214,7 +233,7 @@ def run_analysis(path, score_label, op_label, offset, hop, cal, tg_token, tg_cha
         note = f'<div class="el-banner {"el-info" if ok else "el-warn"}">Telegram: {html.escape(msg)}</div>'
     cam_msg = ("" if cam is not None else
                "💡 Live edge inference uses TFLite (~1s response time). Detailed Grad-CAM figures are available in the <b>Model & Results</b> tab.")
-    return (verdict_html(res) + note, scores_html(res) + warnings_html(res), fig_t, fig_s, fig_p, show, tmp.name, cam_msg)
+    return (verdict_html(res) + note, scores_html(res) + warnings_html(res), fig_d, fig_t, fig_s, fig_p, show, tmp.name, cam_msg)
 
 
 def run_calibration(files):
@@ -504,6 +523,7 @@ def build_ui(port=7860):
                     with gr.Column(scale=7):
                         verdict = gr.HTML()
                         scores = gr.HTML()
+                        plot_d = gr.Plot(label="Diagnostic & Health Profile")
                         plot_t = gr.Plot(label="Timeline")
                         plot_s = gr.Plot(label="Spectrogram and Grad-CAM")
                         cam_note = gr.Markdown("")
@@ -511,7 +531,7 @@ def build_ui(port=7860):
                         table = gr.Dataframe(label="Per-window scores", interactive=False, wrap=True)
                         csv = gr.File(label="Download windows (CSV)")
                 go.click(run_analysis, [audio, score_dd, op_rd, offset, hop, cal_state, tg_token, tg_chat, tg_on],
-                         [verdict, scores, plot_t, plot_s, plot_p, table, csv, cam_note], api_name="analyze")
+                         [verdict, scores, plot_d, plot_t, plot_s, plot_p, table, csv, cam_note], api_name="analyze")
                 cal_btn.click(run_calibration, [cal_files], [cal_state, cal_msg], api_name="calibrate")
                 tg_test.click(lambda t, c: core.send_telegram(t, c, "EchoLab test message: alerts are working.")[1], [tg_token, tg_chat], [tg_msg])
 

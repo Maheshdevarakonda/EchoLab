@@ -301,6 +301,22 @@ def main():
                         </div>
                         """, unsafe_allow_html=True)
 
+                        # Physics-Informed Diagnostic Profiler
+                        diag = res.get("diagnostics", {})
+                        if diag:
+                            st.markdown(f"""
+                            <div style="background:#0f1e36; border:1px solid #1e3a8a; border-radius:12px; padding:16px 20px; margin:14px 0;">
+                                <div style="display:flex; justify-content:space-between; align-items:center;">
+                                    <span style="color:#60a5fa; font-weight:700; font-size:0.85rem; letter-spacing:0.1em; text-transform:uppercase;">🔬 Physics-Informed Root-Cause Profiler</span>
+                                    <span style="background:{diag['status_color']}; color:white; padding:3px 10px; border-radius:20px; font-size:0.75rem; font-weight:700;">{diag['status_label']} ({diag['health_score']}%)</span>
+                                </div>
+                                <h4 style="margin:10px 0 6px 0; color:#f8fafc; font-size:1.15rem;">Primary Diagnosis: <span style="color:#38bdf8;">{diag['primary_cause']}</span></h4>
+                                <p style="margin:0; color:#cbd5e1; font-size:0.9rem; line-height:1.4;"><b>Actionable Maintenance:</b> {diag['recommendation']}</p>
+                            </div>
+                            """, unsafe_allow_html=True)
+
+                            st.pyplot(core.fig_root_cause(diag))
+
                         # Scores Summary Table
                         score_rows = ""
                         for s_name in SCORES:
