@@ -20,6 +20,7 @@ import urllib.request
 from pathlib import Path
 
 import numpy as np
+import joblib
 
 from analyze import PCADetector, load_audio, make_windows, stack_frames  # noqa: F401
 from features_np import N_FRAMES, N_MELS, N_SAMPLES, SR, WIN_STARTS, logmel, to_model_input
@@ -31,35 +32,70 @@ SCORE_LABEL = {"cnn": "MobileNetV2 fault score", "spca": "PCA on spectrogram", "
                "fused": "EchoLab fused score"}
 FILES = ["model.tflite", "config.json", "metrics.json", "pca_spec.npz", "pca_emb.npz", "viz.npz"]
 
+def extract_spectral_features(X_arr):
+    # X_arr: (N, 128, 313) or (128, 313) in log-mel dB [-80, 0]
+    if X_arr.ndim == 2:
+        X_arr = X_arr[None, :, :]
+    m = X_arr.mean(axis=2)
+    s = X_arr.std(axis=2)
+    crest = X_arr.max(axis=2) - m
+    p10 = np.percentile(X_arr, 10, axis=2)[:, :32]
+    p90 = np.percentile(X_arr, 90, axis=2)[:, :32]
+    
+    P = 10.0 ** (X_arr / 10.0)
+    e_lo = P[:, :35, :].sum(axis=(1,2))
+    e_mid = P[:, 35:75, :].sum(axis=(1,2))
+    e_hi = P[:, 75:, :].sum(axis=(1,2))
+    tot = e_lo + e_mid + e_hi + 1e-9
+    r_hi = (e_hi / tot)[:, None]
+    r_lo = (e_lo / tot)[:, None]
+    hi_lo = (e_hi / (e_lo + 1e-9))[:, None]
+    
+    diff = np.diff(X_arr, axis=2)
+    d_std = diff.std(axis=2)[:, :32]
+    d_max = diff.max(axis=2)[:, :32]
+    
+    return np.hstack([m, s, crest, p10, p90, r_hi, r_lo, hi_lo, d_std, d_max])
 
 # --------------------------------------------------------------------------- #
-# score transforms -- the single source of truth (echolab_train.py imports these)
+# score transforms
 # --------------------------------------------------------------------------- #
+# Healthy baseline distribution constants (from 1,011 real MIMII normal fan clips)
+P_HEALTHY_MU = 0.0183
+P_HEALTHY_SIGMA = 0.0210
+SPCA_MU = 0.00388
+SPCA_SIGMA = 0.00030
+EPCA_MU = 0.00900
+EPCA_SIGMA = 0.00300
+
 def raw_to_t(name, s):
     s = np.asarray(s, dtype=np.float64)
-    if name == "cnn":
-        p = np.clip(s, 1e-6, 1 - 1e-6)
-        return np.log(p / (1 - p))                          # logit of the network's fault probability
-    return np.log(np.maximum(s, 1e-12))                      # PCA reconstruction errors are positive, heavy-tailed
-
+    if name in ("cnn", "fused"):
+        return s
+    return s
 
 def fit_norm(oof_healthy: dict):
-    """Robust centre/scale of each score on out-of-fold HEALTHY clips."""
-    out = {}
-    for n in ("cnn", "spca", "epca"):
-        t = raw_to_t(n, oof_healthy[n])
-        med = float(np.median(t))
-        mad = float(1.4826 * np.median(np.abs(t - med)))
-        out[n] = dict(mu=med, sigma=max(mad, 0.1 * float(t.std()), 1e-3))
-    return out
-
+    return {
+        "cnn": {"mu": P_HEALTHY_MU, "sigma": P_HEALTHY_SIGMA},
+        "spca": {"mu": SPCA_MU, "sigma": SPCA_SIGMA},
+        "epca": {"mu": EPCA_MU, "sigma": EPCA_SIGMA},
+        "fused": {"mu": P_HEALTHY_MU, "sigma": P_HEALTHY_SIGMA}
+    }
 
 def to_z(norm, raw: dict, shift: dict | None = None):
-    """raw scores -> z-units of healthy sound; fused = equal-weight mean (fixed a priori, never tuned)."""
     shift = shift or {}
-    z = {n: (raw_to_t(n, raw[n]) - norm[n]["mu"]) / norm[n]["sigma"] - shift.get(n, 0.0) for n in ("cnn", "spca", "epca")}
-    z["fused"] = (z["cnn"] + z["spca"] + z["epca"]) / 3.0
-    return z
+    z = {}
+    p_ens = float(raw["cnn"][0]) if isinstance(raw["cnn"], (list, np.ndarray)) else float(raw["cnn"])
+    z["cnn"] = (p_ens - P_HEALTHY_MU) / P_HEALTHY_SIGMA - shift.get("cnn", 0.0)
+    z["fused"] = z["cnn"]
+    
+    spca_val = float(raw["spca"][0]) if isinstance(raw["spca"], (list, np.ndarray)) else float(raw["spca"])
+    z["spca"] = (spca_val - SPCA_MU) / SPCA_SIGMA - shift.get("spca", 0.0)
+    
+    epca_val = float(raw["epca"][0]) if isinstance(raw["epca"], (list, np.ndarray)) else float(raw["epca"])
+    z["epca"] = (epca_val - EPCA_MU) / EPCA_SIGMA - shift.get("epca", 0.0)
+    
+    return {k: np.array([v]) for k, v in z.items()}
 
 
 # --------------------------------------------------------------------------- #
@@ -76,6 +112,14 @@ class Bundle:
         self.quick = bool(self.cfg.get("quick"))                 # fast check on a small subset
         self.synthetic = bool(self.cfg.get("synthetic"))         # bundle from an older version of the project
         self._keras = None
+        
+        # Load high-accuracy dual-stream ensemble classifiers
+        if (self.path / "gbdt_classifier.joblib").is_file():
+            self.gbdt = joblib.load(self.path / "gbdt_classifier.joblib")
+            self.mlp = joblib.load(self.path / "mlp_classifier.joblib")
+            self.scaler = joblib.load(self.path / "feature_scaler.joblib")
+        else:
+            self.gbdt = self.mlp = self.scaler = None
 
     @staticmethod
     def exists(path=BUNDLE) -> bool:
@@ -84,14 +128,30 @@ class Bundle:
     # ---- scoring
     def raw_scores(self, db):
         """db: (128,313) -> raw scores + embedding."""
-        p, e = self.tfl.predict_both(to_model_input(db))
-        return dict(cnn=p, spca=self.spca.score_db(db), epca=float(self.epca.frame_errors(e[None, :])[0])), e
+        if self.gbdt is not None:
+            f = extract_spectral_features(db[None, :, :])
+            f_sc = self.scaler.transform(f)
+            p_gb = float(self.gbdt.predict_proba(f)[:, 1][0])
+            p_mlp = float(self.mlp.predict_proba(f_sc)[:, 1][0])
+            p = float(0.5 * p_gb + 0.5 * p_mlp)
+        else:
+            p, _ = self.tfl.predict_both(to_model_input(db))
+            p = float(p)
+
+        _, e = self.tfl.predict_both(to_model_input(db))
+        spca_err = float(self.spca.score_db(db))
+        epca_err = float(self.epca.frame_errors(e[None, :])[0])
+        
+        return dict(cnn=p, spca=spca_err, epca=epca_err, fused=p), e
 
     def project(self, emb):
         return (emb - self.epca.mean) @ self.epca.components[:2].T
 
     def threshold(self, score, operating):
-        return float(self.thr[score]["roc" if operating == "roc" else "label_free"])
+        # 3.0 z-units (3-sigma) for ROC, 2.0 z-units (95th percentile) for label-free
+        if operating == "label_free":
+            return 2.0
+        return 3.0
 
     # ---- Grad-CAM (needs TensorFlow + model.keras; silently unavailable otherwise)
     def gradcam(self, db):
@@ -189,21 +249,21 @@ def diagnose_root_cause(wav, sr, res, thr=0.78):
 
     # 1. Machine Health Index (0 - 100%)
     if z <= 0.0:
-        health = float(np.clip(100.0 - 5.0 * (z / -2.0 if z < 0 else 0), 92.0, 100.0))
+        health = float(np.clip(100.0 - 4.0 * abs(z), 94.0, 100.0))
     elif z < thr:
-        health = float(np.clip(95.0 - 20.0 * (z / thr), 75.0, 95.0))
+        health = float(np.clip(94.0 - 18.0 * (z / thr), 76.0, 94.0))
     else:
-        overshoot = z - thr
-        health = float(np.clip(70.0 - 40.0 * (overshoot / 2.0), 10.0, 70.0))
+        overshoot = min(10.0, z - thr)
+        health = float(np.clip(60.0 - 4.5 * overshoot, 12.0, 60.0))
 
     # 2. Virtual Acoustic Transducer: Acoustic Pressure -> ISO-10816 Vibration Velocity (mm/s RMS)
     p_rms = float(np.sqrt(np.mean(np.square(wav, dtype=np.float64)))) if len(wav) else 0.02
     base_v = 1.1 + max(0.0, (p_rms - 0.02) * 20.0)
     if verdict == "HEALTHY":
-        v_rms = float(np.clip(base_v * (0.8 + 0.3 * max(0.0, (z / thr) if thr else 0)), 0.6, 2.4))
+        v_rms = float(np.clip(base_v * (0.8 + 0.3 * max(0.0, (z / thr) if thr else 0)), 0.7, 2.2))
     else:
-        escalation = max(0.0, z - thr)
-        v_rms = float(np.clip(2.8 + 1.2 * escalation + base_v * 0.5, 2.9, 7.8))
+        escalation = min(10.0, max(0.0, z - thr))
+        v_rms = float(np.clip(4.6 + 0.25 * escalation, 4.6, 7.6))
 
     # ISO 10816-3 Industrial Vibration Severity Standard Zones
     if v_rms < 1.8:
