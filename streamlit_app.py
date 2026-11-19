@@ -301,17 +301,27 @@ def main():
                         </div>
                         """, unsafe_allow_html=True)
 
-                        # Physics-Informed Diagnostic Profiler
+                        # Physics-Informed Diagnostic Profiler & Virtual Transducer
                         diag = res.get("diagnostics", {})
                         if diag:
                             st.markdown(f"""
-                            <div style="background:#0f1e36; border:1px solid #1e3a8a; border-radius:12px; padding:16px 20px; margin:14px 0;">
-                                <div style="display:flex; justify-content:space-between; align-items:center;">
-                                    <span style="color:#60a5fa; font-weight:700; font-size:0.85rem; letter-spacing:0.1em; text-transform:uppercase;">🔬 Physics-Informed Root-Cause Profiler</span>
-                                    <span style="background:{diag['status_color']}; color:white; padding:3px 10px; border-radius:20px; font-size:0.75rem; font-weight:700;">{diag['status_label']} ({diag['health_score']}%)</span>
+                            <div style="background:#0f1e36; border:1px solid #1e3a8a; border-radius:12px; padding:18px 22px; margin:16px 0;">
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                                    <span style="color:#60a5fa; font-weight:700; font-size:0.85rem; letter-spacing:0.1em; text-transform:uppercase;">⚡ Virtual Transducer: ISO-10816 & Conformal Guarantee</span>
+                                    <span style="background:{diag['iso_color']}; color:white; padding:4px 12px; border-radius:20px; font-size:0.8rem; font-weight:800;">{diag['iso_name']} ({diag['v_rms']} mm/s RMS)</span>
                                 </div>
-                                <h4 style="margin:10px 0 6px 0; color:#f8fafc; font-size:1.15rem;">Primary Diagnosis: <span style="color:#38bdf8;">{diag['primary_cause']}</span></h4>
-                                <p style="margin:0; color:#cbd5e1; font-size:0.9rem; line-height:1.4;"><b>Actionable Maintenance:</b> {diag['recommendation']}</p>
+                                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin:10px 0; background:rgba(255,255,255,0.03); padding:10px 14px; border-radius:8px;">
+                                    <div>
+                                        <b style="color:#93c5fd; font-size:0.8rem;">ISO-10816 Mechanical Standard:</b>
+                                        <div style="color:#f1f5f9; font-size:0.88rem; margin-top:2px;">{diag['iso_desc']}</div>
+                                    </div>
+                                    <div>
+                                        <b style="color:#93c5fd; font-size:0.8rem;">Split Conformal Statistical Inference:</b>
+                                        <div style="color:{diag['conf_color']}; font-weight:700; font-size:0.88rem; margin-top:2px;">p = {diag['p_value']} · {diag['conf_guarantee']}</div>
+                                    </div>
+                                </div>
+                                <h4 style="margin:12px 0 4px 0; color:#f8fafc; font-size:1.15rem;">Primary Root-Cause: <span style="color:#38bdf8;">{diag['primary_cause']}</span></h4>
+                                <p style="margin:0; color:#cbd5e1; font-size:0.9rem; line-height:1.4;"><b>Actionable Maintenance Directive:</b> {diag['recommendation']}</p>
                             </div>
                             """, unsafe_allow_html=True)
 

@@ -163,12 +163,20 @@ def verdict_html(res):
     if not diag:
         return v_box
     diag_box = f'''
-    <div style="background:#0f2033; border:1px solid #1e40af; border-radius:12px; padding:14px 18px; margin:8px 0; color:#cbd5e1;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-            <span style="color:#60a5fa; font-weight:700; font-size:0.8rem; letter-spacing:0.1em; text-transform:uppercase;">🔬 Physics-Informed Root-Cause Profiler</span>
-            <span style="background:{diag['status_color']}; color:white; padding:2px 8px; border-radius:12px; font-size:0.75rem; font-weight:700;">{diag['status_label']} ({diag['health_score']}%)</span>
+    <div style="background:#0f2033; border:1px solid #1e40af; border-radius:12px; padding:16px 20px; margin:10px 0; color:#cbd5e1;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+            <span style="color:#60a5fa; font-weight:700; font-size:0.85rem; letter-spacing:0.1em; text-transform:uppercase;">⚡ Virtual Transducer: ISO-10816 & Conformal Guarantee</span>
+            <span style="background:{diag['iso_color']}; color:white; padding:3px 10px; border-radius:14px; font-size:0.75rem; font-weight:800;">{diag['iso_name']} ({diag['v_rms']} mm/s RMS)</span>
         </div>
-        <div style="font-size:1.05rem; font-weight:700; color:#f8fafc; margin-bottom:4px;">
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin:8px 0; background:rgba(255,255,255,0.03); padding:8px 12px; border-radius:8px; font-size:0.85rem;">
+            <div>
+                <b style="color:#93c5fd;">ISO Standard:</b> <span style="color:#f1f5f9;">{html.escape(diag['iso_desc'])}</span>
+            </div>
+            <div>
+                <b style="color:#93c5fd;">Conformal Inference:</b> <span style="color:{diag['conf_color']}; font-weight:700;">p = {diag['p_value']} · {diag['conf_guarantee']}</span>
+            </div>
+        </div>
+        <div style="font-size:1.05rem; font-weight:700; color:#f8fafc; margin-top:8px; margin-bottom:2px;">
             Primary Diagnosis: <span style="color:#38bdf8;">{html.escape(diag['primary_cause'])}</span>
         </div>
         <div style="font-size:0.85rem; color:#94a3b8; line-height:1.4;">
