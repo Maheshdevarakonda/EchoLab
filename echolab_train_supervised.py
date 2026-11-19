@@ -35,6 +35,10 @@ from analyze import PCADetector, stack_frames
 from echolab_core import SCORES, SCORE_LABEL, fit_norm, to_z, raw_to_t
 from features_np import N_FRAMES, N_MELS
 
+from sklearn.preprocessing import StandardScaler
+from sklearn.neural_network import MLPClassifier
+import joblib
+
 OUT = Path("models/echolab")
 DECK_BASELINE = dict(name="Koizumi 2020 autoencoder baseline", auc=53.96, pauc=49.24,
                      note="Official DCASE 2020 Task 2 baseline on fan id_00 (53.96 % AUC)")
@@ -49,7 +53,23 @@ def extract_spectral_features(X_arr):
     crest = X_arr.max(axis=2) - m
     p10 = np.percentile(X_arr, 10, axis=2)[:, :32]
     p90 = np.percentile(X_arr, 90, axis=2)[:, :32]
-    return np.hstack([m, s, crest, p10, p90])
+    
+    # Physics-informed tri-band acoustic power ratios
+    P = 10.0 ** (X_arr / 10.0)
+    e_lo = P[:, :35, :].sum(axis=(1,2))
+    e_mid = P[:, 35:75, :].sum(axis=(1,2))
+    e_hi = P[:, 75:, :].sum(axis=(1,2))
+    tot = e_lo + e_mid + e_hi + 1e-9
+    r_hi = (e_hi / tot)[:, None]
+    r_lo = (e_lo / tot)[:, None]
+    hi_lo = (e_hi / (e_lo + 1e-9))[:, None]
+    
+    # Temporal impulse dynamics (clicks & rattling in low and mid frequencies)
+    diff = np.diff(X_arr, axis=2)
+    d_std = diff.std(axis=2)[:, :32]
+    d_max = diff.max(axis=2)[:, :32]
+    
+    return np.hstack([m, s, crest, p10, p90, r_hi, r_lo, hi_lo, d_std, d_max])
 
 def main():
     t_start = time.time()
@@ -97,14 +117,22 @@ def main():
     spca_scores = np.array([spca.score_db(X[i]) for i in range(len(X))])
     oof_spca = spca_scores
 
-    # 5-fold CV with GBDT on spectral + gradient features
-    clf = HistGradientBoostingClassifier(random_state=42, l2_regularization=2.0, max_iter=150)
+    # 5-fold CV with Physics-Informed Dual-Stream Ensemble (GBDT + MLP)
+    clf = HistGradientBoostingClassifier(random_state=42, l2_regularization=2.5, learning_rate=0.08, max_iter=160, min_samples_leaf=20)
+    scaler = StandardScaler()
+    F_scaled = scaler.fit_transform(F_spec)
+    mlp = MLPClassifier(hidden_layer_sizes=(64, 32), max_iter=250, random_state=42, alpha=1.5)
     
     fold_aucs = []
     fold_rows = []
     for k, (tr_idx, val_idx) in enumerate(skf.split(F_spec, y)):
         clf.fit(F_spec[tr_idx], y[tr_idx])
-        val_probs = clf.predict_proba(F_spec[val_idx])[:, 1]
+        val_probs_gb = clf.predict_proba(F_spec[val_idx])[:, 1]
+        
+        mlp.fit(F_scaled[tr_idx], y[tr_idx])
+        val_probs_mlp = mlp.predict_proba(F_scaled[val_idx])[:, 1]
+        
+        val_probs = 0.5 * val_probs_gb + 0.5 * val_probs_mlp
         oof_cnn[val_idx] = val_probs
         
         auc_k = roc_auc_score(y[val_idx], val_probs)
@@ -125,9 +153,13 @@ def main():
     std_auc = float(np.std(fold_aucs))
     log(f"\nMean 5-Fold AUC: {mean_auc*100:.2f} +/- {std_auc*100:.2f} %")
 
-    # Fit final classifier on all data
+    # Fit final classifiers on all data & save
     clf.fit(F_spec, y)
-    all_probs = clf.predict_proba(F_spec)[:, 1]
+    mlp.fit(F_scaled, y)
+    joblib.dump(clf, OUT / "gbdt_classifier.joblib")
+    joblib.dump(mlp, OUT / "mlp_classifier.joblib")
+    joblib.dump(scaler, OUT / "feature_scaler.joblib")
+    all_probs = 0.5 * clf.predict_proba(F_spec)[:, 1] + 0.5 * mlp.predict_proba(F_scaled)[:, 1]
 
     # Threshold optimization
     fpr, tpr, thresholds = roc_curve(y, oof_cnn)

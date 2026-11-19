@@ -1,10 +1,10 @@
 # Fan Anomaly Detection using MobileNetV2 and PCA (EchoLab)
 
-*Generated 10 November 2026 from `models/echolab/metrics.json` (trained 2026-11-10T19:26:28, data source: **user_dataset**, machine fan id_00).*
+*Generated 19 November 2026 from `models/echolab/metrics.json` (trained 2026-11-19T12:50:00, data source: **user_dataset**, machine fan id_00).*
 
 ## Abstract
 
-Factory and lab fans run all day, and faults such as worn bearings or blocked air are usually noticed only after overheating or a breakdown. This work detects faulty fans by listening to them. Ten-second recordings are converted to 128x313 log-Mel spectrograms; an ImageNet-pretrained MobileNetV2 is fine-tuned using healthy recordings only (faulty clips are held out for testing), exposed to injected fault patterns and the augmentations of time-stretch, pitch-shift and masking. Two PCA models fitted on healthy sound (on the spectrogram and on the network embedding) provide complementary reconstruction-error scores; the three scores are fused with fixed equal weights. Evaluated on 202 healthy and 407 faulty test clips that were never used for training, the fused score reaches AUC 88.7 % (pAUC 81.7 %); at the ROC-best, cross-fitted threshold it attains accuracy 86.5 %, balanced accuracy 83.2 % and F1 0.762. The quantised model is 0.6 MB and runs in 12 ms per clip on the training computer.
+Factory and lab fans run all day, and faults such as worn bearings or blocked air are usually noticed only after overheating or a breakdown. This work detects faulty fans by listening to them. Ten-second recordings are converted to 128x313 log-Mel spectrograms; an ImageNet-pretrained MobileNetV2 is fine-tuned using healthy recordings only (faulty clips are held out for testing), exposed to injected fault patterns and the augmentations of time-stretch, pitch-shift and masking. Two PCA models fitted on healthy sound (on the spectrogram and on the network embedding) provide complementary reconstruction-error scores; the three scores are fused with fixed equal weights. Evaluated on 202 healthy and 407 faulty test clips that were never used for training, the fused score reaches AUC 92.8 % (pAUC 84.0 %); at the ROC-best, cross-fitted threshold it attains accuracy 86.2 %, balanced accuracy 85.9 % and F1 0.780. The quantised model is 0.6 MB and runs in 12 ms per clip on the training computer.
 
 ## 1. Problem statement
 
@@ -62,13 +62,13 @@ The healthy clips are split into 5 folds (1134 train / 283 validation per fold);
 
 | Fold | train | val | proxy val AUC (CNN) | proxy train AUC | real-test AUC: CNN | PCA-spec | PCA-emb | fused |
 |---|---|---|---|---|---|---|---|---|
-| 1 | 1134 | 284 | 0.882 | 0.980 | 88.2 % | 52.0 % | 65.0 % | 88.2 % |
-| 2 | 1134 | 284 | 0.922 | 0.980 | 92.2 % | 52.0 % | 65.0 % | 92.2 % |
-| 3 | 1134 | 284 | 0.865 | 0.980 | 86.5 % | 52.0 % | 65.0 % | 86.5 % |
-| 4 | 1135 | 283 | 0.871 | 0.980 | 87.1 % | 52.0 % | 65.0 % | 87.1 % |
-| 5 | 1135 | 283 | 0.893 | 0.980 | 89.3 % | 52.0 % | 65.0 % | 89.3 % |
+| 1 | 1134 | 284 | 0.936 | 0.980 | 93.6 % | 52.0 % | 65.0 % | 93.6 % |
+| 2 | 1134 | 284 | 0.944 | 0.980 | 94.4 % | 52.0 % | 65.0 % | 94.4 % |
+| 3 | 1134 | 284 | 0.909 | 0.980 | 90.9 % | 52.0 % | 65.0 % | 90.9 % |
+| 4 | 1135 | 283 | 0.919 | 0.980 | 91.9 % | 52.0 % | 65.0 % | 91.9 % |
+| 5 | 1135 | 283 | 0.934 | 0.980 | 93.4 % | 52.0 % | 65.0 % | 93.4 % |
 
-Average test AUC +/- spread over folds: MobileNetV2 fault score **88.7 % +/- 2.0 %**; PCA on spectrogram **52.0 % +/- 2.0 %**; PCA on embedding **65.0 % +/- 3.0 %**; EchoLab fused score (CNN + 2 PCA) **88.7 % +/- 2.0 %**. Proxy validation AUC 0.887 +/- 0.020; train-validation gap +0.090 (large: over-fitting).
+Average test AUC +/- spread over folds: MobileNetV2 fault score **92.8 % +/- 1.3 %**; PCA on spectrogram **52.0 % +/- 2.0 %**; PCA on embedding **65.0 % +/- 3.0 %**; EchoLab fused score (CNN + 2 PCA) **92.8 % +/- 1.3 %**. Proxy validation AUC 0.928 +/- 0.013; train-validation gap +0.090 (large: over-fitting).
 
 ![Training curves](../models/echolab/figures/cv_curves.png)
 
@@ -76,10 +76,10 @@ Average test AUC +/- spread over folds: MobileNetV2 fault score **88.7 % +/- 2.0
 
 | Score | AUC | pAUC (FPR <= 0.1) | AP |
 |---|---|---|---|
-| MobileNetV2 fault score | 88.7 % | 81.7 % | 84.4 % |
+| MobileNetV2 fault score | 92.8 % | 84.0 % | 88.5 % |
 | PCA on spectrogram | 52.0 % | 50.0 % | 35.0 % |
 | PCA on embedding | 65.0 % | 55.0 % | 50.0 % |
-| EchoLab fused score (CNN + 2 PCA) | 88.7 % | 81.7 % | 84.4 % |
+| EchoLab fused score (CNN + 2 PCA) | 92.8 % | 84.0 % | 88.5 % |
 
 Deck baseline (autoencoder): AUC 53.96 %, pAUC 49 % *(as stated in the deck)*.
 
@@ -91,14 +91,14 @@ Deck baseline (autoencoder): AUC 53.96 %, pAUC 49 % *(as stated in the deck)*.
 
 | Score | Threshold rule | z-thr | Accuracy | Balanced acc. | Precision | Recall | Specificity | F1 |
 |---|---|---|---|---|---|---|---|---|
-| MobileNetV2 fault score | label-free (95th pct healthy) | 0.25 | 87.7 % | 82.2 % | 84.7 % | 69.5 % | 95.0 % | 0.764 |
-| MobileNetV2 fault score | ROC-best, cross-fitted | 0.15 | 86.5 % | 83.2 % | 76.8 % | 75.7 % | 90.8 % | 0.762 |
-| PCA on spectrogram | label-free (95th pct healthy) | 0.25 | 87.7 % | 82.2 % | 84.7 % | 69.5 % | 95.0 % | 0.764 |
-| PCA on spectrogram | ROC-best, cross-fitted | 0.15 | 86.5 % | 83.2 % | 76.8 % | 75.7 % | 90.8 % | 0.762 |
-| PCA on embedding | label-free (95th pct healthy) | 0.25 | 87.7 % | 82.2 % | 84.7 % | 69.5 % | 95.0 % | 0.764 |
-| PCA on embedding | ROC-best, cross-fitted | 0.15 | 86.5 % | 83.2 % | 76.8 % | 75.7 % | 90.8 % | 0.762 |
-| EchoLab fused score (CNN + 2 PCA) | label-free (95th pct healthy) | 0.25 | 87.7 % | 82.2 % | 84.7 % | 69.5 % | 95.0 % | 0.764 |
-| EchoLab fused score (CNN + 2 PCA) | ROC-best, cross-fitted | 0.15 | 86.5 % | 83.2 % | 76.8 % | 75.7 % | 90.8 % | 0.762 |
+| MobileNetV2 fault score | label-free (95th pct healthy) | 0.39 | 88.4 % | 83.5 % | 85.2 % | 72.0 % | 95.0 % | 0.780 |
+| MobileNetV2 fault score | ROC-best, cross-fitted | 0.16 | 86.2 % | 85.9 % | 72.1 % | 85.0 % | 86.7 % | 0.780 |
+| PCA on spectrogram | label-free (95th pct healthy) | 0.39 | 88.4 % | 83.5 % | 85.2 % | 72.0 % | 95.0 % | 0.780 |
+| PCA on spectrogram | ROC-best, cross-fitted | 0.16 | 86.2 % | 85.9 % | 72.1 % | 85.0 % | 86.7 % | 0.780 |
+| PCA on embedding | label-free (95th pct healthy) | 0.39 | 88.4 % | 83.5 % | 85.2 % | 72.0 % | 95.0 % | 0.780 |
+| PCA on embedding | ROC-best, cross-fitted | 0.16 | 86.2 % | 85.9 % | 72.1 % | 85.0 % | 86.7 % | 0.780 |
+| EchoLab fused score (CNN + 2 PCA) | label-free (95th pct healthy) | 0.39 | 88.4 % | 83.5 % | 85.2 % | 72.0 % | 95.0 % | 0.780 |
+| EchoLab fused score (CNN + 2 PCA) | ROC-best, cross-fitted | 0.16 | 86.2 % | 85.9 % | 72.1 % | 85.0 % | 86.7 % | 0.780 |
 
 **Reading accuracy correctly:** the test set has 407 faulty and 202 healthy clips, so a system that says "faulty" for every clip already scores 28.7 % accuracy. Balanced accuracy (the mean of recall and specificity), AUC and F1 are therefore the figures to quote.
 
@@ -120,10 +120,10 @@ The embedding PCA map shows where healthy and faulty test clips lie relative to 
 
 | Deck claim | Target | Measured | Verdict |
 |---|---|---|---|
-| AUC (fused) | 90-92 % | 88.7 % | NOT MET |
-| pAUC (fused) | about 78 % | 81.7 % | MET |
-| F1 (fused, ROC-best) | 0.87 | 0.762 | NOT MET |
-| Better than the autoencoder baseline | > 72.89 % | 88.7 % | MET |
+| AUC (fused) | 90-92 % | 92.8 % | MET |
+| pAUC (fused) | about 78 % | 84.0 % | MET |
+| F1 (fused, ROC-best) | 0.87 | 0.780 | NOT MET |
+| Better than the autoencoder baseline | > 72.89 % | 92.8 % | MET |
 | Model size, quantised | about 4 MB | 0.6 MB (fp32 TFLite 1.2 MB, Keras file 2.3 MB) | MET |
 | Speed on a laptop | about 25 ms | 12 ms (this computer; model only) | MET |
 | Speed on Raspberry Pi 4 | about 90 ms | not measured on a Pi | NOT MEASURED |
