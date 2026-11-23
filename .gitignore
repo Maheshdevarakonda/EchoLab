@@ -17,6 +17,7 @@ fan/
 *.flac
 *.ogg
 *.zip
+!samples/*.wav
 
 # Temporary training fold caches & logs
 models/echolab_work/
